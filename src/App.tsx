@@ -10,7 +10,11 @@ const App = () => {
     const [last, setLast] = useState<number | undefined>(undefined);
     const [endpoint, setEndpoint] = useState('');
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    useEffect(() => {
+        init();
+    }, []);
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         console.log({
             private_key: privateKey || undefined,
@@ -20,10 +24,16 @@ const App = () => {
             last: last || undefined,
             endpoint: endpoint,
         });
-        request_records(privateKey, viewKey, start, end, last, endpoint)
+        try {
+            const records = request_records(privateKey, viewKey, start, end, last, endpoint);
+            console.log(records);
+        } catch (error) {
+            console.error("Failed to request records:", error);
+        }
+
     };
 
-    const handleInputChange = <T,>(
+    const handleInputChange = <T, >(
         event: React.ChangeEvent<HTMLInputElement>,
         setState: React.Dispatch<React.SetStateAction<T>>
     ) => {
