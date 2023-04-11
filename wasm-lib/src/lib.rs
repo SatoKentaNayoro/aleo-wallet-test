@@ -40,7 +40,9 @@ pub async fn request_records(
         end,
         last,
         endpoint,
-    ).await {
+    )
+    .await
+    {
         Ok(records) => RecordScanner::new(
             "".to_string(),
             records.into_iter().map(|r| JsValue::from_str(&r)).collect(),

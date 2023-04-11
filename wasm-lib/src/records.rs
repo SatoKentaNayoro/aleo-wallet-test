@@ -1,14 +1,10 @@
 use crate::utils::parse_account;
-use crate::CurrentNetwork;
 use anyhow::{bail, ensure};
-use js_sys::Array;
 use snarkvm_console_account::{PrivateKey, ViewKey};
 use snarkvm_console_program::{Ciphertext, Field, Network, Plaintext, Record};
 use snarkvm_synthesizer::Block;
-use std::io::{stdout, Write};
-use std::str::FromStr;
 
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, Response};
 
@@ -27,7 +23,8 @@ pub(crate) async fn request_records_internal<N: Network>(
     let (start_height, end_height) = parse_block_range(start, end, last, endpoint.clone()).await?;
 
     // Fetch the records_web from the network.
-    let records = fetch_records::<N>(private_key, &view_key, &endpoint, start_height, end_height).await?;
+    let records =
+        fetch_records::<N>(private_key, &view_key, &endpoint, start_height, end_height).await?;
 
     // Output the decrypted records_web associated with the view key.
     if records.is_empty() {
@@ -35,7 +32,9 @@ pub(crate) async fn request_records_internal<N: Network>(
     } else {
         let mut res = Vec::new();
         for r in records {
-            res.push(r.to_string())
+            let s = serde_json::to_string_pretty(&r)?.replace("\\n", "");
+            println!("{}", s);
+            res.push(s)
         }
         Ok(res)
     }
@@ -92,9 +91,7 @@ async fn fetch_latest_height(endpoint: &str) -> anyhow::Result<u32> {
             }
         };
         let resp_text = match JsFuture::from(resp).await {
-            Ok(text) => {
-                text
-            }
+            Ok(text) => text,
             Err(err) => {
                 return Err(anyhow::Error::msg(err.as_string().unwrap_or_default()));
             }
@@ -103,7 +100,7 @@ async fn fetch_latest_height(endpoint: &str) -> anyhow::Result<u32> {
             None => {
                 return Err(anyhow::Error::msg("failed to convert resp_test to string"));
             }
-            Some(s) => s
+            Some(s) => s,
         };
         let latest_height: u32 = resp_string
             .parse()
@@ -134,17 +131,11 @@ async fn req_endpoint(endpoint: &str) -> anyhow::Result<Response> {
                 }
             };
             match resp_value.dyn_into() {
-                Ok(res) => {
-                    Ok(res)
-                }
-                Err(e) => {
-                    Err(anyhow::Error::msg(e.as_string().unwrap_or_default()))
-                }
+                Ok(res) => Ok(res),
+                Err(e) => Err(anyhow::Error::msg(e.as_string().unwrap_or_default())),
             }
         }
-        None => {
-            Err(anyhow::Error::msg("failed to load window"))
-        }
+        None => Err(anyhow::Error::msg("failed to load window")),
     }
 }
 
@@ -206,7 +197,9 @@ async fn fetch_records<N: Network>(
                         endpoint,
                         *commitment,
                         ciphertext_record,
-                    ).await? {
+                    )
+                    .await?
+                    {
                         records.push(record);
                     }
                 }
@@ -269,9 +262,7 @@ async fn fetch_blocks<N: Network>(endpoint: &str) -> anyhow::Result<Vec<Block<N>
             }
         };
         let resp_text = match JsFuture::from(resp).await {
-            Ok(text) => {
-                text
-            }
+            Ok(text) => text,
             Err(err) => {
                 return Err(anyhow::Error::msg(err.as_string().unwrap_or_default()));
             }
@@ -280,35 +271,45 @@ async fn fetch_blocks<N: Network>(endpoint: &str) -> anyhow::Result<Vec<Block<N>
             None => {
                 return Err(anyhow::Error::msg("failed to convert resp_test to string"));
             }
-            Some(s) => s
+            Some(s) => s,
         };
 
-        let blocks = serde_json::from_str(&resp_string).map_err(|_| anyhow::Error::msg("Failed to parse Block from response"))?;
+        let blocks = serde_json::from_str(&resp_string)
+            .map_err(|_| anyhow::Error::msg("Failed to parse Block from response"))?;
         Ok(blocks)
     } else {
         Err(anyhow::Error::msg("Fetch request failed."))
     }
 }
 
+// wasm-pack test --chrome
+#[cfg(target_arch = "wasm32")]
+mod tests {
+    use wasm_bindgen_test::{console_log, wasm_bindgen_test, wasm_bindgen_test_configure};
+    wasm_bindgen_test_configure!(run_in_browser);
 
-#[test]
-fn test_request_records_internal() {
-    use wasm_bindgen::JsValue;
-    match request_records_internal::<CurrentNetwork>(
-        None,
-        "AViewKey1mSnpFFC8Mj4fXbK5YiWgZ3mjiV8CxA79bYNa8ymUpTrw".to_string(),
-        Some(82870),
-        Some(82900),
-        None,
-        "http://115.231.235.242:33030".to_string(),
-    ) {
-        Ok(records) => {
-            for r in records {
-                println!("{}", r)
+    #[wasm_bindgen_test]
+    async fn test_request_records_internal() {
+        use crate::records::request_records_internal;
+        use crate::CurrentNetwork;
+        match request_records_internal::<CurrentNetwork>(
+            None,
+            "AViewKey1mSnpFFC8Mj4fXbK5YiWgZ3mjiV8CxA79bYNa8ymUpTrw".to_string(),
+            Some(82870),
+            Some(82900),
+            None,
+            "http://115.231.235.242:33030".to_string(),
+        )
+        .await
+        {
+            Ok(records) => {
+                for r in records {
+                    console_log!("{}", r)
+                }
             }
-        }
-        Err(e) => {
-            println!("{}", e);
+            Err(e) => {
+                console_log!("{}", e);
+            }
         }
     }
 }
