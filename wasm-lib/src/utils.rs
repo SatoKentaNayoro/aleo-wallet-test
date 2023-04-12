@@ -4,8 +4,6 @@ use snarkvm_console_account::{PrivateKey, ViewKey};
 use snarkvm_console_network_environment::Environment;
 use snarkvm_console_program::Network;
 use snarkvm_utilities::FromBytes;
-use std::fs::File;
-use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 use wasm_bindgen::{JsCast, JsValue};
@@ -102,37 +100,30 @@ pub(crate) async fn get_request(endpoint: &str) -> anyhow::Result<Response> {
     }
 }
 
-fn get_credits_proving_keys<N: Network>(path: &str) -> IndexMap<String, Arc<MarlinProvingKey<N>>> {
-    let mut file = File::open(path).unwrap();
-    let mut content = Vec::new();
-    let _ = file.read_to_end(&mut content).unwrap();
-
-    let credits_proving_keys_middle: IndexMap<String, Vec<u8>> =
-        bincode::deserialize(&content).unwrap();
+fn get_credits_proving_keys<E: Environment>(data: &[u8]) -> anyhow::Result<IndexMap<String, Arc<MarlinProvingKey<E>>>> {
+    let credits_proving_keys_raw: IndexMap<String, Vec<u8>> = bincode::deserialize(data).map_err(|err| anyhow::Error::msg(format!("failed to deserialize data: {}", err)))?;
     let mut credits_proving_keys = IndexMap::new();
-    for (k, v) in credits_proving_keys_middle.iter() {
-        let le: Arc<MarlinProvingKey<N>> =
-            Arc::new(MarlinProvingKey::<N>::read_le(v.as_slice()).unwrap());
+    for (k, v) in credits_proving_keys_raw.iter() {
+        let le: Arc<MarlinProvingKey<E>> =
+            Arc::new(MarlinProvingKey::<E>::read_le(v.as_slice()).map_err(|err|anyhow::Error::msg(format!("failed to read_le data: {}", err)))?);
         credits_proving_keys.insert(k.clone(), le);
     }
-    credits_proving_keys
+    Ok(credits_proving_keys)
 }
 
 #[test]
 fn test_credits_proving_keys() {
     use crate::CurrentNetwork;
     use indexmap::IndexMap;
-    use snarkvm_algorithms::snark::marlin::{CircuitProvingKey, MarlinHidingMode};
-    use snarkvm_console_network::{Environment, CREDITS_PROVING_KEYS};
+    use snarkvm_console_network::CREDITS_PROVING_KEYS;
     use snarkvm_console_network_environment::Console;
     use snarkvm_synthesizer::Program;
-    use snarkvm_utilities::{FromBytes, ToBytes};
+    use snarkvm_utilities::ToBytes;
     use std::fs::File;
     use std::io::{Read, Write};
-    use std::sync::Arc;
 
-    type MarlinProvingKey<N> =
-        CircuitProvingKey<<N as Environment>::PairingCurve, MarlinHidingMode>;
+    // type MarlinProvingKey<N> =
+    //     CircuitProvingKey<<N as Environment>::PairingCurve, MarlinHidingMode>;
 
     let mut new_credits_proving_keys = IndexMap::new();
 
@@ -165,12 +156,12 @@ fn test_credits_proving_keys() {
 
     assert_eq!(credits_proving_keys_2, credits_proving_keys_1);
 
-    let mut credits_proving_keys_3 = IndexMap::new();
-    for (k, v) in credits_proving_keys_2.iter() {
-        let le: Arc<MarlinProvingKey<Console>> =
-            Arc::new(MarlinProvingKey::<Console>::read_le(v.as_slice()).unwrap());
-        credits_proving_keys_3.insert(k.clone(), le);
-    }
-
+    // let mut credits_proving_keys_3 = IndexMap::new();
+    // for (k, v) in credits_proving_keys_2.iter() {
+    //     let le: Arc<MarlinProvingKey<Console>> =
+    //         Arc::new(MarlinProvingKey::<Console>::read_le(v.as_slice()).unwrap());
+    //     credits_proving_keys_3.insert(k.clone(), le);
+    // }
+    let credits_proving_keys_3 = get_credits_proving_keys::<Console>(&content).unwrap();
     assert_eq!(new_credits_proving_keys, credits_proving_keys_3)
 }

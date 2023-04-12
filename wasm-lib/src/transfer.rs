@@ -18,6 +18,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use wasm_bindgen_futures::JsFuture;
 
+pub const CREDITS_PROVING_KEYS_T: &[u8] = include_bytes!("../credits_proving_keys");
+
 pub(crate) async fn transfer_internal<N: Network>(
     private_key: String,
     record: String,
