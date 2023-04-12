@@ -159,10 +159,12 @@ async fn handle_transaction<N: Network>(
 
 
 // wasm-pack test --chrome
-#[cfg(target_arch = "wasm32")]
+// #[cfg(target_arch = "wasm32")]
 mod tests {
     use wasm_bindgen_test::{console_log, wasm_bindgen_test, wasm_bindgen_test_configure};
     wasm_bindgen_test_configure!(run_in_browser);
+
+    const TRANSFER_CONF_DATA: &'static [u8] = include_bytes!("transfer_conf");
 
     #[wasm_bindgen_test]
     async fn test_transfer_internal() {
@@ -174,19 +176,19 @@ mod tests {
         use crate::transfer::transfer_internal;
         use crate::CurrentNetwork;
 
-        let path = Path::new("./src/transfer_conf");
-        let file = File::open(&path).unwrap();
-        let reader = io::BufReader::new(file);
+        let file_contents = std::str::from_utf8(TRANSFER_CONF_DATA).unwrap();
+        let conf = file_contents.split('\n').into_iter().map(|c|c.to_string()).collect::<Vec<String>>();
 
-        let mut conf = Vec::new();
-
-        for line_result in reader.lines() {
-            let line = line_result.unwrap();
-            conf.push(line)
-        }
-        println!("{}", conf[3].clone());
+        console_log!("{}", conf[3].clone());
 
         let msg = transfer_internal::<CurrentNetwork>(conf[0].clone(), conf[3].clone(), u64::from_str(&conf[4]).unwrap(), conf[5].clone(), conf[1].clone(), conf[2].clone()).await.unwrap();
-        println!("{}", msg)
+        console_log!("{}", msg)
+    }
+
+    #[test]
+    fn test_transfer_conf_data() {
+        let file_contents = std::str::from_utf8(TRANSFER_CONF_DATA).unwrap();
+        let split = file_contents.split('\n').into_iter().map(|c|c.to_string()).collect::<Vec<String>>();
+        println!("{:?}", split);
     }
 }
