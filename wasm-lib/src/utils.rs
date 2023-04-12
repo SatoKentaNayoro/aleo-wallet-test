@@ -100,6 +100,8 @@ pub(crate) async fn get_request(endpoint: &str) -> anyhow::Result<Response> {
     }
 }
 
+// 验证邮箱
+
 fn get_credits_proving_keys<E: Environment>(data: &[u8]) -> anyhow::Result<IndexMap<String, Arc<MarlinProvingKey<E>>>> {
     let credits_proving_keys_raw: IndexMap<String, Vec<u8>> = bincode::deserialize(data).map_err(|err| anyhow::Error::msg(format!("failed to deserialize data: {}", err)))?;
     let mut credits_proving_keys = IndexMap::new();
