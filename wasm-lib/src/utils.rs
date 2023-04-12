@@ -1,6 +1,13 @@
+use indexmap::IndexMap;
+use snarkvm_algorithms::snark::marlin::{CircuitProvingKey, MarlinHidingMode};
 use snarkvm_console_account::{PrivateKey, ViewKey};
+use snarkvm_console_network_environment::Environment;
 use snarkvm_console_program::Network;
+use snarkvm_utilities::FromBytes;
+use std::fs::File;
+use std::io::Read;
 use std::str::FromStr;
+use std::sync::Arc;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Headers, Request, RequestInit, Response};
@@ -15,6 +22,7 @@ use web_sys::{Headers, Request, RequestInit, Response};
 //     #[cfg(feature = "console_error_panic_hook")]
 //     console_error_panic_hook::set_once();
 // }
+type MarlinProvingKey<N> = CircuitProvingKey<<N as Environment>::PairingCurve, MarlinHidingMode>;
 
 pub(crate) fn parse_account<N: Network>(
     private_key: Option<String>,
@@ -94,10 +102,21 @@ pub(crate) async fn get_request(endpoint: &str) -> anyhow::Result<Response> {
     }
 }
 
-// pub(crate) fn init_credits_keys<N:Network>() {
-//     let program = Program::<N>::credits()?;
-//
-// }
+fn get_credits_proving_keys<N: Network>(path: &str) -> IndexMap<String, Arc<MarlinProvingKey<N>>> {
+    let mut file = File::open(path).unwrap();
+    let mut content = Vec::new();
+    let _ = file.read_to_end(&mut content).unwrap();
+
+    let credits_proving_keys_middle: IndexMap<String, Vec<u8>> =
+        bincode::deserialize(&content).unwrap();
+    let mut credits_proving_keys = IndexMap::new();
+    for (k, v) in credits_proving_keys_middle.iter() {
+        let le: Arc<MarlinProvingKey<N>> =
+            Arc::new(MarlinProvingKey::<N>::read_le(v.as_slice()).unwrap());
+        credits_proving_keys.insert(k.clone(), le);
+    }
+    credits_proving_keys
+}
 
 #[test]
 fn test_credits_proving_keys() {

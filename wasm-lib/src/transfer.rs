@@ -1,3 +1,10 @@
+/**
+ * @Author IronC <apehuang123@gmail.com>
+ * @create 2023/4/12 10:34
+ * @Project aleo-wallet-test
+ *
+ * This file is part of aleo-wallet-test.
+ */
 use crate::utils::post_request;
 use anyhow::{bail, ensure};
 use serde_json::from_str;
@@ -10,14 +17,6 @@ use snarkvm_utilities::ToBytes;
 use std::path::PathBuf;
 use std::str::FromStr;
 use wasm_bindgen_futures::JsFuture;
-
-/**
- * @Author IronC <apehuang123@gmail.com>
- * @create 2023/4/12 10:34
- * @Project aleo-wallet-test
- *
- * This file is part of aleo-wallet-test.
- */
 
 pub(crate) async fn transfer_internal<N: Network>(
     private_key: String,
