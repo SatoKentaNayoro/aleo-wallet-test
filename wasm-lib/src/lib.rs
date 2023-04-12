@@ -1,14 +1,11 @@
 mod records;
-mod utils;
 mod transfer;
+mod utils;
 
-use crate::records::{RecordScanner, request_records_internal};
-use js_sys::Array;
-use snarkvm_console_account::address::Address;
-use snarkvm_console_network::{Testnet3, Visibility};
-use snarkvm_console_program::{Plaintext, Record};
-use wasm_bindgen::prelude::*;
+use crate::records::{request_records_internal, RecordScanner};
 use crate::transfer::transfer_internal;
+use snarkvm_console_network::Testnet3;
+use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -45,7 +42,7 @@ pub async fn request_records(
         last,
         endpoint,
     )
-        .await
+    .await
     {
         Ok(records) => RecordScanner::new(
             "".to_string(),
@@ -64,10 +61,17 @@ pub async fn transfer(
     query_endpoint: String,
     broadcast: String,
 ) -> String {
-    match transfer_internal::<CurrentNetwork>(private_key, record, amount, recipient, query_endpoint, broadcast).await {
+    match transfer_internal::<CurrentNetwork>(
+        private_key,
+        record,
+        amount,
+        recipient,
+        query_endpoint,
+        broadcast,
+    )
+    .await
+    {
         Ok(transaction) => transaction,
-        Err(e) => format!("error: {}", e)
+        Err(e) => format!("error: {}", e),
     }
 }
-
-

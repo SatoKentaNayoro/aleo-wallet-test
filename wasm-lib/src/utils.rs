@@ -32,22 +32,31 @@ pub(crate) fn parse_account<N: Network>(
     Ok((pk, view_key))
 }
 
-pub(crate) async fn post_request(endpoint: &str, value: &serde_json::Value) -> anyhow::Result<Response>{
+pub(crate) async fn post_request(
+    endpoint: &str,
+    value: &serde_json::Value,
+) -> anyhow::Result<Response> {
     let window = web_sys::window().unwrap();
     let mut request_init = RequestInit::new();
     request_init.method("POST");
     request_init.mode(web_sys::RequestMode::Cors);
 
-    let mut headers = Headers::new().map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
-    headers.append("Content-Type", "application/json").map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
+    let headers =
+        Headers::new().map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
+    headers
+        .append("Content-Type", "application/json")
+        .map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
     request_init.headers(&headers.into());
 
     let body = JsValue::from_str(&value.to_string());
     request_init.body(Some(&body));
 
-    let request = Request::new_with_str_and_init(&endpoint, &request_init).map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
+    let request = Request::new_with_str_and_init(endpoint, &request_init)
+        .map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
 
-    let response = JsFuture::from(window.fetch_with_request(&request)).await.map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
+    let response = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(|js_value| anyhow::Error::msg(format!("{:?}", js_value)))?;
     let response = response.dyn_into::<Response>().unwrap();
 
     if response.ok() {
@@ -83,4 +92,66 @@ pub(crate) async fn get_request(endpoint: &str) -> anyhow::Result<Response> {
         }
         None => Err(anyhow::Error::msg("failed to load window")),
     }
+}
+
+// pub(crate) fn init_credits_keys<N:Network>() {
+//     let program = Program::<N>::credits()?;
+//
+// }
+
+#[test]
+fn test_credits_proving_keys() {
+    use crate::CurrentNetwork;
+    use indexmap::IndexMap;
+    use snarkvm_algorithms::snark::marlin::{CircuitProvingKey, MarlinHidingMode};
+    use snarkvm_console_network::{Environment, CREDITS_PROVING_KEYS};
+    use snarkvm_console_network_environment::Console;
+    use snarkvm_synthesizer::Program;
+    use snarkvm_utilities::{FromBytes, ToBytes};
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::sync::Arc;
+
+    type MarlinProvingKey<N> =
+        CircuitProvingKey<<N as Environment>::PairingCurve, MarlinHidingMode>;
+
+    let mut new_credits_proving_keys = IndexMap::new();
+
+    let program = Program::<CurrentNetwork>::credits().unwrap();
+    for k in program.functions().keys() {
+        if let Some(v) = CREDITS_PROVING_KEYS.get(&k.to_string()) {
+            new_credits_proving_keys.insert(k.to_string(), v.clone());
+        }
+    }
+    println!("{:?}", new_credits_proving_keys.keys());
+    assert_eq!(
+        new_credits_proving_keys.len(),
+        program.functions().keys().len()
+    );
+
+    let mut credits_proving_keys_1 = IndexMap::new();
+    for (k, v) in new_credits_proving_keys.iter() {
+        credits_proving_keys_1.insert(k.clone(), v.clone().to_bytes_le().unwrap());
+    }
+
+    let serialized_data = bincode::serialize(&credits_proving_keys_1).unwrap();
+    let mut file = File::create("credits_proving_keys_test").unwrap();
+    file.write_all(&serialized_data).unwrap();
+
+    let mut file = File::open("credits_proving_keys_test").unwrap();
+    let mut content = Vec::new();
+    let _ = file.read_to_end(&mut content).unwrap();
+
+    let credits_proving_keys_2: IndexMap<String, Vec<u8>> = bincode::deserialize(&content).unwrap();
+
+    assert_eq!(credits_proving_keys_2, credits_proving_keys_1);
+
+    let mut credits_proving_keys_3 = IndexMap::new();
+    for (k, v) in credits_proving_keys_2.iter() {
+        let le: Arc<MarlinProvingKey<Console>> =
+            Arc::new(MarlinProvingKey::<Console>::read_le(v.as_slice()).unwrap());
+        credits_proving_keys_3.insert(k.clone(), le);
+    }
+
+    assert_eq!(new_credits_proving_keys, credits_proving_keys_3)
 }

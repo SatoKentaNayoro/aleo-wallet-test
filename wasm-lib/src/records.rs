@@ -5,10 +5,9 @@ use snarkvm_console_account::{PrivateKey, ViewKey};
 use snarkvm_console_program::{Ciphertext, Field, Network, Plaintext, Record};
 use snarkvm_synthesizer::Block;
 
-use wasm_bindgen::JsCast;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{Request, RequestInit, Response};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::Response;
 
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -207,7 +206,7 @@ async fn fetch_records<N: Network>(
                         *commitment,
                         ciphertext_record,
                     )
-                        .await?
+                    .await?
                     {
                         records.push(record);
                     }
@@ -309,7 +308,7 @@ mod tests {
             None,
             "http://115.231.235.242:33030".to_string(),
         )
-            .await
+        .await
         {
             Ok(records) => {
                 for r in records {
