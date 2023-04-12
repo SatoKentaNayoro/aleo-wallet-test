@@ -1,5 +1,6 @@
-use crate::utils::parse_account;
+use crate::utils::{get_request, parse_account};
 use anyhow::{bail, ensure};
+use js_sys::Array;
 use snarkvm_console_account::{PrivateKey, ViewKey};
 use snarkvm_console_program::{Ciphertext, Field, Network, Plaintext, Record};
 use snarkvm_synthesizer::Block;
@@ -7,6 +8,42 @@ use snarkvm_synthesizer::Block;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, Response};
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+#[derive(Debug)]
+pub struct RecordScanner {
+    msg: String,
+    records: Array,
+}
+
+#[wasm_bindgen]
+impl RecordScanner {
+    #[wasm_bindgen(constructor)]
+    pub fn new(msg: String, records: Array) -> Self {
+        RecordScanner { msg, records }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn msg(&self) -> String {
+        self.msg.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn records(&self) -> Array {
+        self.records.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_msg(&mut self, msg: String) {
+        self.msg = msg
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_records(&mut self, records: Array) {
+        self.records = records
+    }
+}
 
 pub(crate) async fn request_records_internal<N: Network>(
     private_key: Option<String>,
@@ -81,7 +118,7 @@ async fn parse_block_range(
 }
 
 async fn fetch_latest_height(endpoint: &str) -> anyhow::Result<u32> {
-    let resp: Response = req_endpoint(endpoint).await?;
+    let resp: Response = get_request(endpoint).await?;
 
     if resp.ok() {
         let resp = match resp.text() {
@@ -108,34 +145,6 @@ async fn fetch_latest_height(endpoint: &str) -> anyhow::Result<u32> {
         Ok(latest_height)
     } else {
         Err(anyhow::Error::msg("Fetch request failed."))
-    }
-}
-
-async fn req_endpoint(endpoint: &str) -> anyhow::Result<Response> {
-    let mut opts = RequestInit::new();
-    opts.method("GET");
-
-    let request = match Request::new_with_str_and_init(endpoint, &opts) {
-        Ok(req) => req,
-        Err(e) => {
-            return Err(anyhow::Error::msg(e.as_string().unwrap_or_default()));
-        }
-    };
-
-    match web_sys::window() {
-        Some(window) => {
-            let resp_value = match JsFuture::from(window.fetch_with_request(&request)).await {
-                Ok(res_v) => res_v,
-                Err(e) => {
-                    return Err(anyhow::Error::msg(e.as_string().unwrap_or_default()));
-                }
-            };
-            match resp_value.dyn_into() {
-                Ok(res) => Ok(res),
-                Err(e) => Err(anyhow::Error::msg(e.as_string().unwrap_or_default())),
-            }
-        }
-        None => Err(anyhow::Error::msg("failed to load window")),
     }
 }
 
@@ -198,7 +207,7 @@ async fn fetch_records<N: Network>(
                         *commitment,
                         ciphertext_record,
                     )
-                    .await?
+                        .await?
                     {
                         records.push(record);
                     }
@@ -233,7 +242,7 @@ async fn decrypt_record<N: Network>(
         let endpoint = format!("{endpoint}/testnet3/find/transitionID/{serial_number}");
 
         // Check if the record is spent.
-        match req_endpoint(&endpoint).await {
+        match get_request(&endpoint).await {
             // On success, skip as the record is spent.
             Ok(_) => Ok(None),
             // On error, add the record.
@@ -252,7 +261,7 @@ async fn decrypt_record<N: Network>(
 }
 
 async fn fetch_blocks<N: Network>(endpoint: &str) -> anyhow::Result<Vec<Block<N>>> {
-    let resp: Response = req_endpoint(endpoint).await?;
+    let resp: Response = get_request(endpoint).await?;
 
     if resp.ok() {
         let resp = match resp.text() {
@@ -300,7 +309,7 @@ mod tests {
             None,
             "http://115.231.235.242:33030".to_string(),
         )
-        .await
+            .await
         {
             Ok(records) => {
                 for r in records {

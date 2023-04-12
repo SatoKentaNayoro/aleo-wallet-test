@@ -1,10 +1,14 @@
 mod records;
 mod utils;
+mod transfer;
 
-use crate::records::request_records_internal;
+use crate::records::{RecordScanner, request_records_internal};
 use js_sys::Array;
-use snarkvm_console_network::Testnet3;
+use snarkvm_console_account::address::Address;
+use snarkvm_console_network::{Testnet3, Visibility};
+use snarkvm_console_program::{Plaintext, Record};
 use wasm_bindgen::prelude::*;
+use crate::transfer::transfer_internal;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -41,7 +45,7 @@ pub async fn request_records(
         last,
         endpoint,
     )
-    .await
+        .await
     {
         Ok(records) => RecordScanner::new(
             "".to_string(),
@@ -52,36 +56,18 @@ pub async fn request_records(
 }
 
 #[wasm_bindgen]
-#[derive(Debug)]
-pub struct RecordScanner {
-    msg: String,
-    records: Array,
-}
-
-#[wasm_bindgen]
-impl RecordScanner {
-    #[wasm_bindgen(constructor)]
-    pub fn new(msg: String, records: Array) -> Self {
-        RecordScanner { msg, records }
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn msg(&self) -> String {
-        self.msg.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn records(&self) -> Array {
-        self.records.clone()
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_msg(&mut self, msg: String) {
-        self.msg = msg
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_records(&mut self, records: Array) {
-        self.records = records
+pub async fn transfer(
+    private_key: String,
+    record: String,
+    amount: u64,
+    recipient: String,
+    query_endpoint: String,
+    broadcast: String,
+) -> String {
+    match transfer_internal::<CurrentNetwork>(private_key, record, amount, recipient, query_endpoint, broadcast).await {
+        Ok(transaction) => transaction,
+        Err(e) => format!("error: {}", e)
     }
 }
+
+
